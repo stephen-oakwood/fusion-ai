@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	a2aClient, err := client.NewA2AClient("http://localhost:8080", client.WithTimeout(30*time.Second))
+	a2aClient, err := client.NewA2AClient("http://localhost:8080", client.WithTimeout(300*time.Second))
 	if err != nil {
 		fmt.Errorf("failed to create A2A client: %v", err)
 	}

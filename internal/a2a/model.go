@@ -10,12 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 )
 
-type inferenceClient struct {
+type modelClient struct {
 	BedrockClient *bedrockruntime.Client
 	BedrockModel  string
 }
 
-func NewInferenceClient() (*inferenceClient, error) {
+func NewModelClient() (*modelClient, error) {
 	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("eu-west-1"), config.WithSharedConfigProfile("archpoc_dev-developer"))
 	if err != nil {
 		fmt.Printf("Couldn't load AWS Config %s", err)
@@ -23,13 +23,21 @@ func NewInferenceClient() (*inferenceClient, error) {
 	}
 	client := bedrockruntime.NewFromConfig(awsConfig)
 
-	return &inferenceClient{
+	return &modelClient{
 		BedrockClient: client,
 		BedrockModel:  "anthropic.claude-3-haiku-20240307-v1:0",
 	}, nil
 }
 
-func (i *inferenceClient) MakeInference(ctx context.Context, converseInput *bedrockruntime.ConverseInput) (string, error) {
+func (i *modelClient) Converse(ctx context.Context, converseInput *bedrockruntime.ConverseInput) (*bedrockruntime.ConverseOutput, error) {
+	converseOutput, err := i.BedrockClient.Converse(ctx, converseInput)
+	if err != nil {
+		return nil, err
+	}
+	return converseOutput, nil
+}
+
+func (i *modelClient) MakeInference(ctx context.Context, converseInput *bedrockruntime.ConverseInput) (string, error) {
 
 	converseOutput, err := i.BedrockClient.Converse(ctx, converseInput)
 	if err != nil {

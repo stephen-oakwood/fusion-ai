@@ -34,9 +34,9 @@ func main() {
 	}
 
 	options := []server.Option{
-		server.WithIdleTimeout(120 * time.Second),
-		server.WithReadTimeout(60 * time.Second),
-		server.WithWriteTimeout(60 * time.Second),
+		server.WithIdleTimeout(300 * time.Second),
+		server.WithReadTimeout(300 * time.Second),
+		server.WithWriteTimeout(300 * time.Second),
 	}
 	srv, err := server.NewA2AServer(agentCard, taskManager, options...)
 	if err != nil {

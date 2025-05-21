@@ -3,6 +3,7 @@ package a2a
 import (
 	"context"
 	"fmt"
+	"fusion/internal/nable"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	"log"
@@ -21,23 +22,24 @@ const systemPrompt = `
 `
 
 type assetManagementAgent struct {
-	InferenceClient *inferenceClient
+	ModelClient *modelClient
 }
 
 func NewAgent() (*assetManagementAgent, error) {
-	inferenceClient, err := NewInferenceClient()
+	modelClient, err := NewModelClient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &assetManagementAgent{
-		InferenceClient: inferenceClient,
+		ModelClient: modelClient,
 	}, nil
 }
 
 func (p *assetManagementAgent) Process(ctx context.Context, taskID string, message protocol.Message, handle taskmanager.TaskHandle) error {
 
 	prompt := extractText(message)
+	var responseParts []protocol.Part
 
 	if prompt == "" {
 		fmt.Printf("task failed - prompt must contain text")
@@ -56,7 +58,7 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 				Value: systemPrompt,
 			},
 		},
-		ModelId: &p.InferenceClient.BedrockModel,
+		ModelId: &p.ModelClient.BedrockModel,
 		Messages: []types.Message{
 			{
 				Content: []types.ContentBlock{
@@ -70,12 +72,41 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 		ToolConfig: &toolConfig,
 	}
 
-	inference, err := p.InferenceClient.MakeInference(ctx, converseInput)
-	if err != nil {
-		return fmt.Errorf("inference failed: %w", err)
-	}
+	converseLoop := true
+	for converseLoop {
+		converseOutput, err := p.ModelClient.Converse(ctx, converseInput)
+		if err != nil {
+			return fmt.Errorf("model inference failed: %w", err)
+		}
 
-	responseParts := []protocol.Part{protocol.NewTextPart(inference)}
+		converseMessage, ok := converseOutput.Output.(*types.ConverseOutputMemberMessage)
+		if !ok {
+			return fmt.Errorf("error casting LLM response")
+		}
+
+		switch converseOutput.StopReason {
+		case types.StopReasonEndTurn:
+			content, ok := converseMessage.Value.Content[0].(*types.ContentBlockMemberText)
+			if !ok {
+				return fmt.Errorf("error casting content block")
+			}
+			responseParts = append(responseParts, protocol.NewTextPart(content.Value))
+			converseLoop = false
+
+		case types.StopReasonToolUse:
+			err := nable.HandleToolUse(converseOutput.Output, &converseInput.Messages)
+			if err != nil {
+				return fmt.Errorf("tool call failed: %w", err)
+			}
+			continue
+
+		case types.StopReasonMaxTokens:
+		case types.StopReasonContentFiltered:
+		case types.StopReasonGuardrailIntervened:
+		default:
+			return fmt.Errorf("unsupported stop reason")
+		}
+	}
 
 	responseMessage := protocol.NewMessage(
 		protocol.MessageRoleAgent,
