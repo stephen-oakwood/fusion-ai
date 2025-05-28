@@ -13,7 +13,7 @@ import (
 
 const systemPrompt = `
 		"You are an IT Technician, capable of providing detailed answers to the questions that your customers ask regarding their assets." +
-		"Think before you reply in <thinking> tags." +
+		"Think before you reply. Inform the customer of each step you are going to take." +
 		"First, determine if there are any knowledge articles related to the question that could help with your reply." +
 		"Second, using available tools, fetch the schema for a graphQL API that provides the ability to search for assets and return their details." +
 		"Third, using the fetched schema, use the graphQL API to collect data from the customer's assets that are relevant to the points raised in the knowledge articles.'" +
@@ -39,7 +39,7 @@ func NewAgent() (*assetManagementAgent, error) {
 func (p *assetManagementAgent) Process(ctx context.Context, taskID string, message protocol.Message, handle taskmanager.TaskHandle) error {
 
 	prompt := extractText(message)
-	var responseParts []protocol.Part
+	var temperature float32 = 0.0
 
 	if prompt == "" {
 		fmt.Printf("task failed - prompt must contain text")
@@ -70,9 +70,13 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 			},
 		},
 		ToolConfig: &toolConfig,
+		InferenceConfig: &types.InferenceConfiguration{
+			Temperature: &temperature,
+		},
 	}
 
 	converseLoop := true
+
 	for converseLoop {
 		converseOutput, err := p.ModelClient.Converse(ctx, converseInput)
 		if err != nil {
@@ -90,10 +94,41 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 			if !ok {
 				return fmt.Errorf("error casting content block")
 			}
-			responseParts = append(responseParts, protocol.NewTextPart(content.Value))
+
+			artifact := protocol.Artifact{
+				Name:        stringPtr("Final Response"),
+				Description: stringPtr("Response from model"),
+				Index:       0,
+				Parts:       []protocol.Part{protocol.NewTextPart(content.Value)},
+				LastChunk:   boolPtr(true),
+			}
+
+			if err := handle.AddArtifact(artifact); err != nil {
+				log.Printf("Error adding artifact for task %s: %v", taskID, err)
+			}
+
+			if err := handle.UpdateStatus(protocol.TaskStateCompleted, nil); err != nil {
+				return fmt.Errorf("failed to update task status: %w", err)
+			}
+
 			converseLoop = false
 
 		case types.StopReasonToolUse:
+
+			for _, item := range converseMessage.Value.Content {
+				switch d := item.(type) {
+				case *types.ContentBlockMemberText:
+					message := &protocol.Message{
+						Role:  protocol.MessageRoleAgent,
+						Parts: []protocol.Part{protocol.NewTextPart(d.Value)},
+					}
+
+					if err := handle.UpdateStatus(protocol.TaskStateWorking, message); err != nil {
+						return fmt.Errorf("failed to update task status: %w", err)
+					}
+				}
+			}
+
 			err := nable.HandleToolUse(converseOutput.Output, &converseInput.Messages)
 			if err != nil {
 				return fmt.Errorf("tool call failed: %w", err)
@@ -106,27 +141,6 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 		default:
 			return fmt.Errorf("unsupported stop reason")
 		}
-	}
-
-	responseMessage := protocol.NewMessage(
-		protocol.MessageRoleAgent,
-		responseParts,
-	)
-
-	if err := handle.UpdateStatus(protocol.TaskStateCompleted, &responseMessage); err != nil {
-		return fmt.Errorf("failed to update task status: %w", err)
-	}
-
-	artifact := protocol.Artifact{
-		Name:        stringPtr("Inference"),
-		Description: stringPtr("Inference response from model"),
-		Index:       0,
-		Parts:       responseParts,
-		LastChunk:   boolPtr(true),
-	}
-
-	if err := handle.AddArtifact(artifact); err != nil {
-		log.Printf("Error adding artifact for task %s: %v", taskID, err)
 	}
 
 	return nil

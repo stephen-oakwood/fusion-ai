@@ -17,8 +17,7 @@ func main() {
 	if err != nil {
 		fmt.Errorf("failed to create A2A client: %v", err)
 	}
-
-	taskID := uuid.New().String()
+	
 	sessionID := uuid.New().String()
 	reader := bufio.NewReader(os.Stdin)
 
@@ -26,6 +25,8 @@ func main() {
 	fmt.Println(strings.Repeat("-", 60))
 
 	for {
+
+		taskID := uuid.New().String()
 
 		fmt.Println("> ")
 		input, readErr := reader.ReadString('\n')
@@ -73,29 +74,43 @@ func handleStandardInteraction(a2aClient *client.A2AClient, params protocol.Send
 		return
 	}
 
-	fmt.Println("\n<< Agent Response:")
-	fmt.Println(strings.Repeat("-", 10))
 	fmt.Printf("  State: %s (%s)\n", task.Status.State, task.Status.Timestamp)
 
-	if task.Status.Message != nil {
-		fmt.Println("  Message:")
-		printParts(task.Status.Message.Parts)
-	}
+	historyLength := 10
 
-	if len(task.Artifacts) > 0 {
-		fmt.Println("  Artifacts:")
-		for i, artifact := range task.Artifacts {
-			name := fmt.Sprintf("Artifact #%d", i+1)
-			if artifact.Name != nil {
-				name = *artifact.Name
-			}
-			fmt.Printf("    [%s]\n", name)
-			printParts(artifact.Parts)
+	if task.Status.State == protocol.TaskStateCompleted {
+		queryParams := protocol.TaskQueryParams{
+			ID:            taskID,
+			HistoryLength: &historyLength,
 		}
-	}
 
-	if task.Status.State == protocol.TaskStateInputRequired {
-		fmt.Println("  [Additional input required]")
+		task, err = a2aClient.GetTasks(ctx, queryParams)
+		if err != nil {
+			fmt.Printf("failed to get tasks %v", err)
+			return
+		}
+
+		for i := 0; i < len(task.History)-1; i++ {
+			message := task.History[i]
+			if message.Role == protocol.MessageRoleAgent {
+				fmt.Printf("\033[1;32m%s", "Agent Response")
+				fmt.Println(strings.Repeat("-", 60))
+				printParts(message.Parts)
+				fmt.Printf("\033[0:30m%s", "\n")
+			} else {
+				fmt.Printf("\033[1;30m%s", "User Response")
+				fmt.Println(strings.Repeat("-", 60))
+				printParts(message.Parts)
+				fmt.Printf("\033[0:30m%s", "\n")
+			}
+		}
+
+		if len(task.Artifacts) > 0 {
+			for _, artifact := range task.Artifacts {
+				fmt.Printf("Artifact [%s]\n", *artifact.Name)
+				printParts(artifact.Parts)
+			}
+		}
 	}
 
 	fmt.Println(strings.Repeat("-", 60))
