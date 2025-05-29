@@ -15,7 +15,7 @@ func GetAgentCard() server.AgentCard {
 			Organization: "n-able",
 		},
 		Capabilities: server.AgentCapabilities{
-			Streaming:              false,
+			Streaming:              true,
 			PushNotifications:      false,
 			StateTransitionHistory: true,
 		},
