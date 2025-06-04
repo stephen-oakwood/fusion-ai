@@ -1,0 +1,21 @@
+
+
+type Query {
+  placeholder: String
+}
+
+type Subscription {
+    agentInteraction(userPrompt: String): AgentMessage!
+}
+
+type AgentMessage {
+    parts: [Part!]!
+    messageType: String
+    messageState: String
+}
+
+union Part = TextPart
+
+type TextPart {
+    text: String!
+}

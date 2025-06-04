@@ -58,7 +58,6 @@ func createTaskParams(taskID, sessionID, input string) protocol.SendTaskParams {
 		ID:        taskID,
 		SessionID: &sessionID,
 		Message:   message,
-		Metadata:  map[string]any{"invocationKey": "1111-2222-3333-4444"},
 	}
 
 	return params
@@ -198,7 +197,7 @@ func printParts(parts []protocol.Part) {
 }
 
 func printPart(part interface{}) {
-	indent := "  "
+	indent := ""
 
 	switch p := part.(type) {
 	case protocol.TextPart:
