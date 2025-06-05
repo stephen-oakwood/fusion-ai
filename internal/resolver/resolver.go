@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"fusion/graph"
 	"fusion/graph/model"
-	"github.com/google/uuid"
 	"reflect"
 	"trpc.group/trpc-go/trpc-a2a-go/client"
 	"trpc.group/trpc-go/trpc-a2a-go/protocol"
@@ -36,13 +35,10 @@ func (r *Resolver) Placeholder(ctx context.Context) (*string, error) {
 	return &str, nil
 }
 
-func (r *Resolver) AgentInteraction(ctx context.Context, userPrompt *string) (<-chan *model.AgentMessage, error) {
-	subscriptionChan := make(chan *model.AgentMessage)
+func (r *Resolver) AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error) {
+	subscriptionChan := make(chan *model.AgentResponse)
 
-	sessionID := uuid.New().String()
-	taskID := uuid.New().String()
-
-	params := createTaskParams(taskID, sessionID, *userPrompt)
+	params := createTaskParams(task.ID, task.SessionID, task.Message)
 
 	agentChan, err := r.a2aClient.StreamTask(ctx, params)
 	if err != nil {
@@ -55,7 +51,7 @@ func (r *Resolver) AgentInteraction(ctx context.Context, userPrompt *string) (<-
 	return subscriptionChan, nil
 }
 
-func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEvent, subscriptionChan chan<- *model.AgentMessage) {
+func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEvent, subscriptionChan chan<- *model.AgentResponse) {
 
 	defer close(subscriptionChan)
 
@@ -86,19 +82,20 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEv
 						case protocol.TextPart:
 							parts = append(parts, model.TextPart{Text: p.Text})
 						case protocol.FilePart:
+							parts = append(parts, model.FilePart{Name: *p.File.Name, MimeType: *p.File.MimeType, Bytes: p.File.Bytes, URI: p.File.URI})
 						case protocol.DataPart:
 						default:
 							fmt.Printf("%sUnsupported part type: %T\n", p)
 						}
 					}
 
-					messageType := reflect.TypeOf(e).Name()
-					messageState := string(e.Status.State)
+					responseType := reflect.TypeOf(e).Name()
+					responseState := string(e.Status.State)
 
-					agentMessage := model.AgentMessage{
-						Parts:        parts,
-						MessageType:  &messageType,
-						MessageState: &messageState,
+					agentMessage := model.AgentResponse{
+						Parts:         parts,
+						ResponseType:  &responseType,
+						ResponseState: &responseState,
 					}
 
 					subscriptionChan <- &agentMessage
@@ -121,6 +118,7 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEv
 					case protocol.TextPart:
 						parts = append(parts, model.TextPart{Text: p.Text})
 					case protocol.FilePart:
+						parts = append(parts, model.FilePart{Name: *p.File.Name, MimeType: *p.File.MimeType, Bytes: p.File.Bytes, URI: p.File.URI})
 					case protocol.DataPart:
 					default:
 						fmt.Printf("%sUnsupported part type: %T\n", p)
@@ -128,9 +126,9 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEv
 				}
 
 				messageType := reflect.TypeOf(e).Name()
-				agentMessage := model.AgentMessage{
-					Parts:       parts,
-					MessageType: &messageType,
+				agentMessage := model.AgentResponse{
+					Parts:        parts,
+					ResponseType: &messageType,
 				}
 
 				subscriptionChan <- &agentMessage

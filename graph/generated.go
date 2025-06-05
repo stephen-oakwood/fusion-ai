@@ -48,10 +48,17 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
-	AgentMessage struct {
-		MessageState func(childComplexity int) int
-		MessageType  func(childComplexity int) int
-		Parts        func(childComplexity int) int
+	AgentResponse struct {
+		Parts         func(childComplexity int) int
+		ResponseState func(childComplexity int) int
+		ResponseType  func(childComplexity int) int
+	}
+
+	FilePart struct {
+		Bytes    func(childComplexity int) int
+		MimeType func(childComplexity int) int
+		Name     func(childComplexity int) int
+		URI      func(childComplexity int) int
 	}
 
 	Query struct {
@@ -59,7 +66,7 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		AgentInteraction func(childComplexity int, userPrompt *string) int
+		AgentTaskExecute func(childComplexity int, task *model.TaskInput) int
 	}
 
 	TextPart struct {
@@ -71,7 +78,7 @@ type QueryResolver interface {
 	Placeholder(ctx context.Context) (*string, error)
 }
 type SubscriptionResolver interface {
-	AgentInteraction(ctx context.Context, userPrompt *string) (<-chan *model.AgentMessage, error)
+	AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error)
 }
 
 type executableSchema struct {
@@ -93,26 +100,54 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
-	case "AgentMessage.messageState":
-		if e.complexity.AgentMessage.MessageState == nil {
+	case "AgentResponse.parts":
+		if e.complexity.AgentResponse.Parts == nil {
 			break
 		}
 
-		return e.complexity.AgentMessage.MessageState(childComplexity), true
+		return e.complexity.AgentResponse.Parts(childComplexity), true
 
-	case "AgentMessage.messageType":
-		if e.complexity.AgentMessage.MessageType == nil {
+	case "AgentResponse.responseState":
+		if e.complexity.AgentResponse.ResponseState == nil {
 			break
 		}
 
-		return e.complexity.AgentMessage.MessageType(childComplexity), true
+		return e.complexity.AgentResponse.ResponseState(childComplexity), true
 
-	case "AgentMessage.parts":
-		if e.complexity.AgentMessage.Parts == nil {
+	case "AgentResponse.responseType":
+		if e.complexity.AgentResponse.ResponseType == nil {
 			break
 		}
 
-		return e.complexity.AgentMessage.Parts(childComplexity), true
+		return e.complexity.AgentResponse.ResponseType(childComplexity), true
+
+	case "FilePart.bytes":
+		if e.complexity.FilePart.Bytes == nil {
+			break
+		}
+
+		return e.complexity.FilePart.Bytes(childComplexity), true
+
+	case "FilePart.mimeType":
+		if e.complexity.FilePart.MimeType == nil {
+			break
+		}
+
+		return e.complexity.FilePart.MimeType(childComplexity), true
+
+	case "FilePart.name":
+		if e.complexity.FilePart.Name == nil {
+			break
+		}
+
+		return e.complexity.FilePart.Name(childComplexity), true
+
+	case "FilePart.uri":
+		if e.complexity.FilePart.URI == nil {
+			break
+		}
+
+		return e.complexity.FilePart.URI(childComplexity), true
 
 	case "Query.placeholder":
 		if e.complexity.Query.Placeholder == nil {
@@ -121,17 +156,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.Placeholder(childComplexity), true
 
-	case "Subscription.agentInteraction":
-		if e.complexity.Subscription.AgentInteraction == nil {
+	case "Subscription.agentTaskExecute":
+		if e.complexity.Subscription.AgentTaskExecute == nil {
 			break
 		}
 
-		args, err := ec.field_Subscription_agentInteraction_args(ctx, rawArgs)
+		args, err := ec.field_Subscription_agentTaskExecute_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Subscription.AgentInteraction(childComplexity, args["userPrompt"].(*string)), true
+		return e.complexity.Subscription.AgentTaskExecute(childComplexity, args["task"].(*model.TaskInput)), true
 
 	case "TextPart.text":
 		if e.complexity.TextPart.Text == nil {
@@ -147,7 +182,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
-	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
+	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputTaskInput,
+	)
 	first := true
 
 	switch opCtx.Operation.Operation {
@@ -288,26 +325,26 @@ func (ec *executionContext) field_Query___type_argsName(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Subscription_agentInteraction_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Subscription_agentTaskExecute_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Subscription_agentInteraction_argsUserPrompt(ctx, rawArgs)
+	arg0, err := ec.field_Subscription_agentTaskExecute_argsTask(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["userPrompt"] = arg0
+	args["task"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Subscription_agentInteraction_argsUserPrompt(
+func (ec *executionContext) field_Subscription_agentTaskExecute_argsTask(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (*string, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userPrompt"))
-	if tmp, ok := rawArgs["userPrompt"]; ok {
-		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+) (*model.TaskInput, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("task"))
+	if tmp, ok := rawArgs["task"]; ok {
+		return ec.unmarshalOTaskInput2ᚖfusionᚋgraphᚋmodelᚐTaskInput(ctx, tmp)
 	}
 
-	var zeroVal *string
+	var zeroVal *model.TaskInput
 	return zeroVal, nil
 }
 
@@ -411,8 +448,8 @@ func (ec *executionContext) field___Type_fields_argsIncludeDeprecated(
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _AgentMessage_parts(ctx context.Context, field graphql.CollectedField, obj *model.AgentMessage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AgentMessage_parts(ctx, field)
+func (ec *executionContext) _AgentResponse_parts(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AgentResponse_parts(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -442,9 +479,9 @@ func (ec *executionContext) _AgentMessage_parts(ctx context.Context, field graph
 	return ec.marshalNPart2ᚕfusionᚋgraphᚋmodelᚐPartᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_AgentMessage_parts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AgentResponse_parts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "AgentMessage",
+		Object:     "AgentResponse",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -455,8 +492,8 @@ func (ec *executionContext) fieldContext_AgentMessage_parts(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _AgentMessage_messageType(ctx context.Context, field graphql.CollectedField, obj *model.AgentMessage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AgentMessage_messageType(ctx, field)
+func (ec *executionContext) _AgentResponse_responseType(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AgentResponse_responseType(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -469,7 +506,7 @@ func (ec *executionContext) _AgentMessage_messageType(ctx context.Context, field
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.MessageType, nil
+		return obj.ResponseType, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -483,9 +520,9 @@ func (ec *executionContext) _AgentMessage_messageType(ctx context.Context, field
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_AgentMessage_messageType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AgentResponse_responseType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "AgentMessage",
+		Object:     "AgentResponse",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -496,8 +533,8 @@ func (ec *executionContext) fieldContext_AgentMessage_messageType(_ context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _AgentMessage_messageState(ctx context.Context, field graphql.CollectedField, obj *model.AgentMessage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AgentMessage_messageState(ctx, field)
+func (ec *executionContext) _AgentResponse_responseState(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AgentResponse_responseState(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -510,7 +547,7 @@ func (ec *executionContext) _AgentMessage_messageState(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.MessageState, nil
+		return obj.ResponseState, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -524,9 +561,179 @@ func (ec *executionContext) _AgentMessage_messageState(ctx context.Context, fiel
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_AgentMessage_messageState(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AgentResponse_responseState(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "AgentMessage",
+		Object:     "AgentResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FilePart_name(ctx context.Context, field graphql.CollectedField, obj *model.FilePart) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FilePart_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FilePart_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FilePart",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FilePart_mimeType(ctx context.Context, field graphql.CollectedField, obj *model.FilePart) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FilePart_mimeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MimeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FilePart_mimeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FilePart",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FilePart_bytes(ctx context.Context, field graphql.CollectedField, obj *model.FilePart) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FilePart_bytes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Bytes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FilePart_bytes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FilePart",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FilePart_uri(ctx context.Context, field graphql.CollectedField, obj *model.FilePart) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FilePart_uri(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.URI, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FilePart_uri(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FilePart",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -709,8 +916,8 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Subscription_agentInteraction(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
-	fc, err := ec.fieldContext_Subscription_agentInteraction(ctx, field)
+func (ec *executionContext) _Subscription_agentTaskExecute(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_agentTaskExecute(ctx, field)
 	if err != nil {
 		return nil
 	}
@@ -723,7 +930,7 @@ func (ec *executionContext) _Subscription_agentInteraction(ctx context.Context, 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Subscription().AgentInteraction(rctx, fc.Args["userPrompt"].(*string))
+		return ec.resolvers.Subscription().AgentTaskExecute(rctx, fc.Args["task"].(*model.TaskInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -737,7 +944,7 @@ func (ec *executionContext) _Subscription_agentInteraction(ctx context.Context, 
 	}
 	return func(ctx context.Context) graphql.Marshaler {
 		select {
-		case res, ok := <-resTmp.(<-chan *model.AgentMessage):
+		case res, ok := <-resTmp.(<-chan *model.AgentResponse):
 			if !ok {
 				return nil
 			}
@@ -745,7 +952,7 @@ func (ec *executionContext) _Subscription_agentInteraction(ctx context.Context, 
 				w.Write([]byte{'{'})
 				graphql.MarshalString(field.Alias).MarshalGQL(w)
 				w.Write([]byte{':'})
-				ec.marshalNAgentMessage2ᚖfusionᚋgraphᚋmodelᚐAgentMessage(ctx, field.Selections, res).MarshalGQL(w)
+				ec.marshalNAgentResponse2ᚖfusionᚋgraphᚋmodelᚐAgentResponse(ctx, field.Selections, res).MarshalGQL(w)
 				w.Write([]byte{'}'})
 			})
 		case <-ctx.Done():
@@ -754,7 +961,7 @@ func (ec *executionContext) _Subscription_agentInteraction(ctx context.Context, 
 	}
 }
 
-func (ec *executionContext) fieldContext_Subscription_agentInteraction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Subscription_agentTaskExecute(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Subscription",
 		Field:      field,
@@ -763,13 +970,13 @@ func (ec *executionContext) fieldContext_Subscription_agentInteraction(ctx conte
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "parts":
-				return ec.fieldContext_AgentMessage_parts(ctx, field)
-			case "messageType":
-				return ec.fieldContext_AgentMessage_messageType(ctx, field)
-			case "messageState":
-				return ec.fieldContext_AgentMessage_messageState(ctx, field)
+				return ec.fieldContext_AgentResponse_parts(ctx, field)
+			case "responseType":
+				return ec.fieldContext_AgentResponse_responseType(ctx, field)
+			case "responseState":
+				return ec.fieldContext_AgentResponse_responseState(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type AgentMessage", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type AgentResponse", field.Name)
 		},
 	}
 	defer func() {
@@ -779,7 +986,7 @@ func (ec *executionContext) fieldContext_Subscription_agentInteraction(ctx conte
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Subscription_agentInteraction_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Subscription_agentTaskExecute_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2781,6 +2988,47 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputTaskInput(ctx context.Context, obj any) (model.TaskInput, error) {
+	var it model.TaskInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "sessionId", "message"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		case "sessionId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SessionID = data
+		case "message":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Message = data
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -2796,6 +3044,13 @@ func (ec *executionContext) _Part(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._TextPart(ctx, sel, obj)
+	case model.FilePart:
+		return ec._FilePart(ctx, sel, &obj)
+	case *model.FilePart:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._FilePart(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -2805,26 +3060,74 @@ func (ec *executionContext) _Part(ctx context.Context, sel ast.SelectionSet, obj
 
 // region    **************************** object.gotpl ****************************
 
-var agentMessageImplementors = []string{"AgentMessage"}
+var agentResponseImplementors = []string{"AgentResponse"}
 
-func (ec *executionContext) _AgentMessage(ctx context.Context, sel ast.SelectionSet, obj *model.AgentMessage) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, agentMessageImplementors)
+func (ec *executionContext) _AgentResponse(ctx context.Context, sel ast.SelectionSet, obj *model.AgentResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, agentResponseImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("AgentMessage")
+			out.Values[i] = graphql.MarshalString("AgentResponse")
 		case "parts":
-			out.Values[i] = ec._AgentMessage_parts(ctx, field, obj)
+			out.Values[i] = ec._AgentResponse_parts(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "messageType":
-			out.Values[i] = ec._AgentMessage_messageType(ctx, field, obj)
-		case "messageState":
-			out.Values[i] = ec._AgentMessage_messageState(ctx, field, obj)
+		case "responseType":
+			out.Values[i] = ec._AgentResponse_responseType(ctx, field, obj)
+		case "responseState":
+			out.Values[i] = ec._AgentResponse_responseState(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var filePartImplementors = []string{"FilePart", "Part"}
+
+func (ec *executionContext) _FilePart(ctx context.Context, sel ast.SelectionSet, obj *model.FilePart) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, filePartImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FilePart")
+		case "name":
+			out.Values[i] = ec._FilePart_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "mimeType":
+			out.Values[i] = ec._FilePart_mimeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bytes":
+			out.Values[i] = ec._FilePart_bytes(ctx, field, obj)
+		case "uri":
+			out.Values[i] = ec._FilePart_uri(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -2930,8 +3233,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 
 	switch fields[0].Name {
-	case "agentInteraction":
-		return ec._Subscription_agentInteraction(ctx, fields[0])
+	case "agentTaskExecute":
+		return ec._Subscription_agentTaskExecute(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -3311,18 +3614,18 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) marshalNAgentMessage2fusionᚋgraphᚋmodelᚐAgentMessage(ctx context.Context, sel ast.SelectionSet, v model.AgentMessage) graphql.Marshaler {
-	return ec._AgentMessage(ctx, sel, &v)
+func (ec *executionContext) marshalNAgentResponse2fusionᚋgraphᚋmodelᚐAgentResponse(ctx context.Context, sel ast.SelectionSet, v model.AgentResponse) graphql.Marshaler {
+	return ec._AgentResponse(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNAgentMessage2ᚖfusionᚋgraphᚋmodelᚐAgentMessage(ctx context.Context, sel ast.SelectionSet, v *model.AgentMessage) graphql.Marshaler {
+func (ec *executionContext) marshalNAgentResponse2ᚖfusionᚋgraphᚋmodelᚐAgentResponse(ctx context.Context, sel ast.SelectionSet, v *model.AgentResponse) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._AgentMessage(ctx, sel, v)
+	return ec._AgentResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
@@ -3710,6 +4013,14 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOTaskInput2ᚖfusionᚋgraphᚋmodelᚐTaskInput(ctx context.Context, v any) (*model.TaskInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputTaskInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

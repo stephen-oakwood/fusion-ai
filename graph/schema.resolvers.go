@@ -15,9 +15,9 @@ func (r *queryResolver) Placeholder(ctx context.Context) (*string, error) {
 	panic(fmt.Errorf("not implemented: Placeholder - placeholder"))
 }
 
-// AgentInteraction is the resolver for the agentInteraction field.
-func (r *subscriptionResolver) AgentInteraction(ctx context.Context, userPrompt *string) (<-chan *model.AgentMessage, error) {
-	panic(fmt.Errorf("not implemented: AgentInteraction - agentInteraction"))
+// AgentTaskExecute is the resolver for the agentTaskExecute field.
+func (r *subscriptionResolver) AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error) {
+	panic(fmt.Errorf("not implemented: AgentTaskExecute - agentTaskExecute"))
 }
 
 // Query returns QueryResolver implementation.
@@ -28,3 +28,15 @@ func (r *Resolver) Subscription() SubscriptionResolver { return &subscriptionRes
 
 type queryResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *subscriptionResolver) AgentInteraction(ctx context.Context, userPrompt *string) (<-chan *model.AgentResponse, error) {
+	panic(fmt.Errorf("not implemented: AgentInteraction - agentInteraction"))
+}
+*/

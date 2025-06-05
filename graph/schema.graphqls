@@ -5,17 +5,30 @@ type Query {
 }
 
 type Subscription {
-    agentInteraction(userPrompt: String): AgentMessage!
+    agentTaskExecute(task: TaskInput): AgentResponse!
 }
 
-type AgentMessage {
+type AgentResponse {
     parts: [Part!]!
-    messageType: String
-    messageState: String
+    responseType: String
+    responseState: String
 }
 
-union Part = TextPart
+union Part = TextPart | FilePart
 
 type TextPart {
     text: String!
+}
+
+type FilePart {
+    name: String!
+    mimeType: String!
+    bytes: String
+    uri: String
+}
+
+input TaskInput {
+    id: String!
+    sessionId: String!
+    message: String!
 }

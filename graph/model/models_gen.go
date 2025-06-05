@@ -6,16 +6,31 @@ type Part interface {
 	IsPart()
 }
 
-type AgentMessage struct {
-	Parts        []Part  `json:"parts"`
-	MessageType  *string `json:"messageType,omitempty"`
-	MessageState *string `json:"messageState,omitempty"`
+type AgentResponse struct {
+	Parts         []Part  `json:"parts"`
+	ResponseType  *string `json:"responseType,omitempty"`
+	ResponseState *string `json:"responseState,omitempty"`
 }
+
+type FilePart struct {
+	Name     string  `json:"name"`
+	MimeType string  `json:"mimeType"`
+	Bytes    *string `json:"bytes,omitempty"`
+	URI      *string `json:"uri,omitempty"`
+}
+
+func (FilePart) IsPart() {}
 
 type Query struct {
 }
 
 type Subscription struct {
+}
+
+type TaskInput struct {
+	ID        string `json:"id"`
+	SessionID string `json:"sessionId"`
+	Message   string `json:"message"`
 }
 
 type TextPart struct {
