@@ -118,6 +118,7 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 			for _, item := range converseMessage.Value.Content {
 				switch d := item.(type) {
 				case *types.ContentBlockMemberText:
+
 					message := &protocol.Message{
 						Role:  protocol.MessageRoleAgent,
 						Parts: []protocol.Part{protocol.NewTextPart(d.Value)},
