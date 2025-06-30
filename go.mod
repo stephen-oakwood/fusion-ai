@@ -7,12 +7,11 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.13
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.30.0
-	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/redis/go-redis/v9 v9.7.3
+	github.com/redis/go-redis/v9 v9.10.0
 	github.com/vektah/gqlparser/v2 v2.5.27
-	trpc.group/trpc-go/trpc-a2a-go v0.0.2
-	trpc.group/trpc-go/trpc-a2a-go/taskmanager/redis v0.0.0-20250515052054-7bd08d21a31e
+	trpc.group/trpc-go/trpc-a2a-go v0.2.0
+	trpc.group/trpc-go/trpc-a2a-go/taskmanager/redis v0.0.0-20250625115112-3bb198d0dc98
 )
 
 require (
@@ -29,13 +28,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.18 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect

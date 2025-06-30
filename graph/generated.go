@@ -2995,7 +2995,7 @@ func (ec *executionContext) unmarshalInputTaskInput(ctx context.Context, obj any
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "sessionId", "message"}
+	fieldsInOrder := [...]string{"id", "contextId", "message"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -3004,18 +3004,18 @@ func (ec *executionContext) unmarshalInputTaskInput(ctx context.Context, obj any
 		switch k {
 		case "id":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.ID = data
-		case "sessionId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
+		case "contextId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contextId"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.SessionID = data
+			it.ContextID = data
 		case "message":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
 			data, err := ec.unmarshalNString2string(ctx, v)

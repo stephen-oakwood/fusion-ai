@@ -11,7 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"trpc.group/trpc-go/trpc-a2a-go/server"
-	redismgr "trpc.group/trpc-go/trpc-a2a-go/taskmanager/redis"
+	redisTaskManager "trpc.group/trpc-go/trpc-a2a-go/taskmanager/redis"
 )
 
 func main() {
@@ -22,13 +22,14 @@ func main() {
 		log.Fatalf("Failed to create agent: %v", err)
 	}
 
-	redisOptions := redis.UniversalOptions{
-		Addrs:    []string{"localhost:6379"},
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
-	}
+	})
 
-	taskManager, err := redismgr.NewRedisTaskManager(redis.NewUniversalClient(&redisOptions), processor)
+	taskManager, err := redisTaskManager.NewTaskManager(redisClient, processor)
+
 	if err != nil {
 		log.Fatalf("Failed to create task manager: %v", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"fusion/graph"
 	"fusion/graph/model"
-	"reflect"
 	"trpc.group/trpc-go/trpc-a2a-go/client"
 	"trpc.group/trpc-go/trpc-a2a-go/protocol"
 )
@@ -38,9 +37,9 @@ func (r *Resolver) Placeholder(ctx context.Context) (*string, error) {
 func (r *Resolver) AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error) {
 	subscriptionChan := make(chan *model.AgentResponse)
 
-	params := createTaskParams(task.ID, task.SessionID, task.Message)
+	params := createMessageParams(task.Message, task.ContextID, 0)
 
-	agentChan, err := r.a2aClient.StreamTask(ctx, params)
+	agentChan, err := r.a2aClient.StreamMessage(ctx, params)
 	if err != nil {
 		fmt.Printf("Stream Task Request Failed %s", err)
 		return nil, err
@@ -51,7 +50,7 @@ func (r *Resolver) AgentTaskExecute(ctx context.Context, task *model.TaskInput) 
 	return subscriptionChan, nil
 }
 
-func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEvent, subscriptionChan chan<- *model.AgentResponse) {
+func processAgentResponses(ctx context.Context, agentChan <-chan protocol.StreamingMessageEvent, subscriptionChan chan<- *model.AgentResponse) {
 
 	defer close(subscriptionChan)
 
@@ -71,25 +70,24 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEv
 				return
 			}
 
-			switch e := event.(type) {
-			case protocol.TaskStatusUpdateEvent:
+			switch e := event.Result.(type) {
+			case *protocol.TaskStatusUpdateEvent:
 				fmt.Printf("  [Status Update: %s (%s)]\n\n", e.Status.State, e.Status.Timestamp)
 				if e.Status.Message != nil {
 
 					var parts []model.Part
 					for _, part := range e.Status.Message.Parts {
 						switch p := part.(type) {
-						case protocol.TextPart:
+						case *protocol.TextPart:
 							parts = append(parts, model.TextPart{Text: p.Text})
-						case protocol.FilePart:
-							parts = append(parts, model.FilePart{Name: *p.File.Name, MimeType: *p.File.MimeType, Bytes: p.File.Bytes, URI: p.File.URI})
-						case protocol.DataPart:
+						case *protocol.FilePart:
+						case *protocol.DataPart:
 						default:
 							fmt.Printf("%sUnsupported part type: %T\n", p)
 						}
 					}
 
-					responseType := reflect.TypeOf(e).Name()
+					responseType := "TaskStatusUpdateEvent"
 					responseState := string(e.Status.State)
 
 					agentMessage := model.AgentResponse{
@@ -109,26 +107,25 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEv
 					}
 				}
 
-			case protocol.TaskArtifactUpdateEvent:
-				fmt.Printf("  [Artifact Update: %s (Last Chunk %b)]\n\n", *e.Artifact.Name, *e.Artifact.LastChunk)
+			case *protocol.TaskArtifactUpdateEvent:
+				fmt.Printf("  [Artifact Update: %s (Last Chunk %b)]\n\n", *e.Artifact.Name, *e.LastChunk)
 
 				var parts []model.Part
 				for _, part := range e.Artifact.Parts {
 					switch p := part.(type) {
-					case protocol.TextPart:
+					case *protocol.TextPart:
 						parts = append(parts, model.TextPart{Text: p.Text})
-					case protocol.FilePart:
-						parts = append(parts, model.FilePart{Name: *p.File.Name, MimeType: *p.File.MimeType, Bytes: p.File.Bytes, URI: p.File.URI})
-					case protocol.DataPart:
+					case *protocol.FilePart:
+					case *protocol.DataPart:
 					default:
 						fmt.Printf("%sUnsupported part type: %T\n", p)
 					}
 				}
 
-				messageType := reflect.TypeOf(e).Name()
+				responseType := "TaskArtifactUpdateEvent"
 				agentMessage := model.AgentResponse{
 					Parts:        parts,
-					ResponseType: &messageType,
+					ResponseType: &responseType,
 				}
 
 				subscriptionChan <- &agentMessage
@@ -141,16 +138,22 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.TaskEv
 	}
 }
 
-func createTaskParams(taskID, sessionID, input string) protocol.SendTaskParams {
-	message := protocol.NewMessage(
+func createMessageParams(input string, contextID string, historyLength int) protocol.SendMessageParams {
+	message := protocol.NewMessageWithContext(
 		protocol.MessageRoleUser,
 		[]protocol.Part{protocol.NewTextPart(input)},
+		nil,
+		&contextID,
 	)
 
-	params := protocol.SendTaskParams{
-		ID:        taskID,
-		SessionID: &sessionID,
-		Message:   message,
+	params := protocol.SendMessageParams{
+		Message: message,
+	}
+
+	if historyLength > 0 {
+		params.Configuration = &protocol.SendMessageConfiguration{
+			HistoryLength: &historyLength,
+		}
 	}
 
 	return params

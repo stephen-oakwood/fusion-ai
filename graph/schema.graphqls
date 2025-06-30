@@ -28,7 +28,7 @@ type FilePart {
 }
 
 input TaskInput {
-    id: String!
-    sessionId: String!
+    id: String
+    contextId: String!
     message: String!
 }

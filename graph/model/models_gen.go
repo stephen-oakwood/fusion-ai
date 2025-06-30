@@ -28,9 +28,9 @@ type Subscription struct {
 }
 
 type TaskInput struct {
-	ID        string `json:"id"`
-	SessionID string `json:"sessionId"`
-	Message   string `json:"message"`
+	ID        *string `json:"id,omitempty"`
+	ContextID string  `json:"contextId"`
+	Message   string  `json:"message"`
 }
 
 type TextPart struct {

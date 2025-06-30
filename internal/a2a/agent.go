@@ -6,7 +6,7 @@ import (
 	"fusion/internal/nable"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
-	"log"
+	"time"
 	"trpc.group/trpc-go/trpc-a2a-go/protocol"
 	"trpc.group/trpc-go/trpc-a2a-go/taskmanager"
 )
@@ -36,20 +36,64 @@ func NewAgent() (*assetManagementAgent, error) {
 	}, nil
 }
 
-func (p *assetManagementAgent) Process(ctx context.Context, taskID string, message protocol.Message, handle taskmanager.TaskHandle) error {
+func (p *assetManagementAgent) ProcessMessage(ctx context.Context, message protocol.Message, options taskmanager.ProcessOptions, handle taskmanager.TaskHandler) (*taskmanager.MessageProcessingResult, error) {
+	inputText := extractText(message)
 
-	prompt := extractText(message)
-	var temperature float32 = 0.0
-
-	if prompt == "" {
-		fmt.Printf("task failed - prompt must contain text")
-		failedMessage := protocol.NewMessage(
+	if inputText == "" {
+		fmt.Printf("process message - input string must contain text")
+		errMsg := protocol.NewMessage(
 			protocol.MessageRoleAgent,
 			[]protocol.Part{protocol.NewTextPart("input message must contain text")},
 		)
-		_ = handle.UpdateStatus(protocol.TaskStateFailed, &failedMessage)
-		return fmt.Errorf("input message must contain text")
+
+		return &taskmanager.MessageProcessingResult{
+			Result: &errMsg,
+		}, nil
 	}
+
+	taskID, err := handle.BuildTask(nil, message.ContextID)
+	if err != nil {
+		return nil, fmt.Errorf("process message - failed to create task: %w", err)
+	}
+
+	if options.Streaming {
+		return p.processStreamingMode(ctx, inputText, message.ContextID, taskID, handle)
+	}
+
+	return p.processNonStreamingMode(ctx, inputText, message.ContextID, taskID, handle)
+
+}
+
+func (p *assetManagementAgent) processStreamingMode(ctx context.Context, inputText string, contextID *string, taskID string, handle taskmanager.TaskHandler) (*taskmanager.MessageProcessingResult, error) {
+
+	subscriber, err := handle.SubScribeTask(&taskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to task: %w", err)
+	}
+
+	go p.processRequest(ctx, inputText, contextID, taskID, handle)
+
+	return &taskmanager.MessageProcessingResult{
+		StreamingEvents: subscriber,
+	}, nil
+}
+
+func (p *assetManagementAgent) processNonStreamingMode(ctx context.Context, inputText string, contextID *string, taskID string, handle taskmanager.TaskHandler) (*taskmanager.MessageProcessingResult, error) {
+
+	p.processRequest(ctx, inputText, contextID, taskID, handle)
+
+	cancellable, err := handle.GetTask(&taskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task: %w", err)
+	}
+
+	return &taskmanager.MessageProcessingResult{
+		Result: cancellable.Task(),
+	}, nil
+}
+
+func (p *assetManagementAgent) processRequest(ctx context.Context, inputText string, contextID *string, taskID string, handle taskmanager.TaskHandler) {
+	var temperature float32 = 0.0
 
 	toolConfig := toolConfig()
 	converseInput := &bedrockruntime.ConverseInput{
@@ -63,7 +107,7 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 			{
 				Content: []types.ContentBlock{
 					&types.ContentBlockMemberText{
-						Value: prompt,
+						Value: inputText,
 					},
 				},
 				Role: types.ConversationRoleUser,
@@ -80,35 +124,53 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 	for converseLoop {
 		converseOutput, err := p.ModelClient.Converse(ctx, converseInput)
 		if err != nil {
-			return fmt.Errorf("model inference failed: %w", err)
+			err = handle.UpdateTaskState(&taskID, protocol.TaskStateFailed, nil)
+			if err != nil {
+				fmt.Errorf("failed to update task status to failed: %w", err)
+			}
+			return
 		}
 
 		converseMessage, ok := converseOutput.Output.(*types.ConverseOutputMemberMessage)
 		if !ok {
-			return fmt.Errorf("error casting LLM response")
+			err = handle.UpdateTaskState(&taskID, protocol.TaskStateFailed, nil)
+			if err != nil {
+				fmt.Errorf("failed to extract converse message: %w", err)
+			}
+			return
 		}
 
 		switch converseOutput.StopReason {
 		case types.StopReasonEndTurn:
 			content, ok := converseMessage.Value.Content[0].(*types.ContentBlockMemberText)
 			if !ok {
-				return fmt.Errorf("error casting content block")
+				err = handle.UpdateTaskState(&taskID, protocol.TaskStateFailed, nil)
+				if err != nil {
+					fmt.Errorf("failed to extract end turn converse message: %w", err)
+				}
+				return
 			}
 
 			artifact := protocol.Artifact{
+				ArtifactID:  protocol.GenerateArtifactID(),
 				Name:        stringPtr("Final Response"),
 				Description: stringPtr("Response from model"),
-				Index:       0,
 				Parts:       []protocol.Part{protocol.NewTextPart(content.Value)},
-				LastChunk:   boolPtr(true),
+				Metadata: map[string]interface{}{
+					"processedAt": time.Now().UTC().Format(time.RFC3339),
+				},
 			}
 
-			if err := handle.AddArtifact(artifact); err != nil {
-				log.Printf("Error adding artifact for task %s: %v", taskID, err)
+			err = handle.AddArtifact(&taskID, artifact, true, false)
+			if err != nil {
+				fmt.Errorf("failed to send artifact event: %w", err)
+				return
 			}
 
-			if err := handle.UpdateStatus(protocol.TaskStateCompleted, nil); err != nil {
-				return fmt.Errorf("failed to update task status: %w", err)
+			err = handle.UpdateTaskState(&taskID, protocol.TaskStateCompleted, nil)
+			if err != nil {
+				fmt.Errorf("failed to send completed event: %w", err)
+				return
 			}
 
 			converseLoop = false
@@ -119,20 +181,27 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 				switch d := item.(type) {
 				case *types.ContentBlockMemberText:
 
-					message := &protocol.Message{
-						Role:  protocol.MessageRoleAgent,
-						Parts: []protocol.Part{protocol.NewTextPart(d.Value)},
-					}
-
-					if err := handle.UpdateStatus(protocol.TaskStateWorking, message); err != nil {
-						return fmt.Errorf("failed to update task status: %w", err)
+					err = handle.UpdateTaskState(&taskID, protocol.TaskStateWorking, &protocol.Message{
+						ContextID: contextID,
+						MessageID: protocol.GenerateMessageID(),
+						Role:      protocol.MessageRoleAgent,
+						Parts:     []protocol.Part{protocol.NewTextPart(d.Value)},
+					})
+					if err != nil {
+						fmt.Errorf("failed to send progress event: %w", err)
+						return
 					}
 				}
 			}
 
 			err := nable.HandleToolUse(converseOutput.Output, &converseInput.Messages)
+
 			if err != nil {
-				return fmt.Errorf("tool call failed: %w", err)
+				err = handle.UpdateTaskState(&taskID, protocol.TaskStateFailed, nil)
+				if err != nil {
+					fmt.Errorf("failed to send failed event after tool use: %w", err)
+				}
+				return
 			}
 			continue
 
@@ -140,11 +209,10 @@ func (p *assetManagementAgent) Process(ctx context.Context, taskID string, messa
 		case types.StopReasonContentFiltered:
 		case types.StopReasonGuardrailIntervened:
 		default:
-			return fmt.Errorf("unsupported stop reason")
+			fmt.Errorf("unsupported stop reason")
+			return
 		}
 	}
-
-	return nil
 }
 
 func boolPtr(b bool) *bool {
@@ -152,10 +220,11 @@ func boolPtr(b bool) *bool {
 }
 
 func extractText(message protocol.Message) string {
+	var inputText string
 	for _, part := range message.Parts {
-		if textPart, ok := part.(protocol.TextPart); ok {
-			return textPart.Text
+		if textPart, ok := part.(*protocol.TextPart); ok {
+			inputText += textPart.Text
 		}
 	}
-	return ""
+	return inputText
 }

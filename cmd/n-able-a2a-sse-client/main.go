@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"strings"
 	"time"
@@ -18,15 +17,13 @@ func main() {
 		fmt.Errorf("failed to create A2A client: %v", err)
 	}
 
-	sessionID := uuid.New().String()
+	contextID := protocol.GenerateContextID()
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("Enter text to send to the agent.")
 	fmt.Println(strings.Repeat("-", 60))
 
 	for {
-
-		taskID := uuid.New().String()
 
 		fmt.Println("> ")
 		input, readErr := reader.ReadString('\n')
@@ -40,59 +37,64 @@ func main() {
 			continue
 		}
 
-		params := createTaskParams(taskID, sessionID, input)
+		params := createMessageParams(input, contextID, 0)
 
-		handleStreamingInteraction(a2aClient, params, taskID)
+		handleStreamingInteraction(a2aClient, params)
 
 	}
 
 }
 
-func createTaskParams(taskID, sessionID, input string) protocol.SendTaskParams {
-	message := protocol.NewMessage(
+func createMessageParams(input string, contextID string, historyLength int) protocol.SendMessageParams {
+	message := protocol.NewMessageWithContext(
 		protocol.MessageRoleUser,
 		[]protocol.Part{protocol.NewTextPart(input)},
+		nil,
+		&contextID,
 	)
 
-	params := protocol.SendTaskParams{
-		ID:        taskID,
-		SessionID: &sessionID,
-		Message:   message,
+	params := protocol.SendMessageParams{
+		Message: message,
+	}
+
+	if historyLength > 0 {
+		params.Configuration = &protocol.SendMessageConfiguration{
+			HistoryLength: &historyLength,
+		}
 	}
 
 	return params
 }
 
-func handleStreamingInteraction(a2aClient *client.A2AClient, params protocol.SendTaskParams, taskID string) {
+func handleStreamingInteraction(a2aClient *client.A2AClient, params protocol.SendMessageParams) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	eventChan, streamErr := a2aClient.StreamTask(ctx, params)
+	eventChan, streamErr := a2aClient.StreamMessage(ctx, params)
 	if streamErr != nil {
-		fmt.Printf("Stream Task Request Failed %s", streamErr)
+		fmt.Printf("Stream Message Request Failed %s", streamErr)
 		return
 	}
 
 	processStreamResponse(ctx, eventChan)
 
-	fmt.Printf("Stream processing finished for tasl %s", taskID)
+	fmt.Printf("Stream processing finished for message %s", params.Message.MessageID)
 	fmt.Println(strings.Repeat("-", 60))
 
 }
 
-func processStreamResponse(ctx context.Context, eventChan <-chan protocol.TaskEvent) (protocol.TaskState, []protocol.Artifact) {
+func processStreamResponse(ctx context.Context, eventChan <-chan protocol.StreamingMessageEvent) string {
 	fmt.Println("\nAgent Response Stream:")
 	fmt.Println(strings.Repeat("-", 60))
 
-	var finalTaskState protocol.TaskState
-	finalArtifacts := []protocol.Artifact{}
+	var taskID string
 
 	for {
 
 		select {
 		case <-ctx.Done():
 			fmt.Printf("Context timeout or cancellatiom while waiting for stream events: %s", ctx.Err())
-			return finalTaskState, finalArtifacts
+			return taskID
 
 		case event, ok := <-eventChan:
 			if !ok {
@@ -100,23 +102,31 @@ func processStreamResponse(ctx context.Context, eventChan <-chan protocol.TaskEv
 				if ctx.Err() != nil {
 					fmt.Printf("Context error after stream close: %s", ctx.Err())
 				}
-				return finalTaskState, finalArtifacts
+				return taskID
 			}
 
-			switch e := event.(type) {
-			case protocol.TaskStatusUpdateEvent:
-				fmt.Printf("  [Status Update: %s (%s)]\n\n", e.Status.State, e.Status.Timestamp)
+			switch e := event.Result.(type) {
+			case *protocol.Message:
+				fmt.Println("[Message Response:]")
+				printMessage(*e)
+			case *protocol.Task:
+				taskID = e.ID
+				fmt.Printf("[Task %s State: %s]\n", e.ID, e.Status.State)
+				if e.Status.Message != nil {
+					printMessage(*e.Status.Message)
+				}
+			case *protocol.TaskStatusUpdateEvent:
+				taskID = e.TaskID
+				fmt.Printf("[Status Update: %s]\n", e.Status.State)
 				if e.Status.Message != nil {
 					printMessage(*e.Status.Message)
 				}
 
-				finalTaskState = e.Status.State
-
 				if e.Status.State == protocol.TaskStateInputRequired {
-					fmt.Println("[Additional Support Required]")
-					return finalTaskState, finalArtifacts
+					fmt.Println("[Additional Input Required]")
+					return taskID
 				} else if e.IsFinal() {
-					fmt.Printf("Final status received: %s", finalTaskState)
+					fmt.Printf("Final status received: %s", e.Status.State)
 
 					if e.Status.State == protocol.TaskStateCompleted {
 						fmt.Println("  [Task completed successfully]")
@@ -125,50 +135,18 @@ func processStreamResponse(ctx context.Context, eventChan <-chan protocol.TaskEv
 					} else if e.Status.State == protocol.TaskStateCanceled {
 						fmt.Println("  [Task was canceled]")
 					}
-					return finalTaskState, finalArtifacts
+					return taskID
 
 				}
-
-			case protocol.TaskArtifactUpdateEvent:
+			case *protocol.TaskArtifactUpdateEvent:
+				taskID = e.TaskID
 				name := getArtifactName(e.Artifact)
-
-				if e.Artifact.Append != nil && *e.Artifact.Append {
-					fmt.Printf("  [Artifact Update: %s (Appending)]\n\n", name)
-				} else {
-					fmt.Printf("  [Artifact Update: %s]\n\n", name)
-				}
+				fmt.Printf("[Artifact Update: %s]\n", name)
 
 				printParts(e.Artifact.Parts)
 
-				if e.Artifact.Append != nil && *e.Artifact.Append && len(finalArtifacts) > 0 {
-
-					for i, art := range finalArtifacts {
-						if art.Index == e.Artifact.Index {
-							// Append parts
-							combinedParts := append(art.Parts, e.Artifact.Parts...)
-							finalArtifacts[i].Parts = combinedParts
-
-							// Update other fields if needed
-							if e.Artifact.Name != nil {
-								finalArtifacts[i].Name = e.Artifact.Name
-							}
-							if e.Artifact.Description != nil {
-								finalArtifacts[i].Description = e.Artifact.Description
-							}
-							if e.Artifact.LastChunk != nil {
-								finalArtifacts[i].LastChunk = e.Artifact.LastChunk
-							}
-
-							break
-						}
-					}
-
-				} else {
-					finalArtifacts = append(finalArtifacts, e.Artifact)
-				}
-
-				if e.IsFinal() {
-					fmt.Printf("Final artifact recieved for index %d", e.Artifact.Index)
+				if e.LastChunk != nil && *e.LastChunk {
+					fmt.Printf("Final artefact received with ID %s", e.Artifact.ArtifactID)
 				}
 
 			default:
@@ -183,7 +161,7 @@ func getArtifactName(artifact protocol.Artifact) string {
 	if artifact.Name != nil {
 		return *artifact.Name
 	}
-	return fmt.Sprintf("Artifact #%d", artifact.Index+1)
+	return fmt.Sprintf("Artifact %s", artifact.ArtifactID)
 }
 
 func printMessage(message protocol.Message) {
@@ -200,10 +178,10 @@ func printPart(part interface{}) {
 	indent := ""
 
 	switch p := part.(type) {
-	case protocol.TextPart:
+	case *protocol.TextPart:
 		fmt.Println(indent + p.Text)
-	case protocol.FilePart:
-	case protocol.DataPart:
+	case *protocol.FilePart:
+	case *protocol.DataPart:
 	default:
 		fmt.Printf("%sUnsupported part type: %T\n", indent, p)
 	}

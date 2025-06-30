@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"strings"
 	"time"
@@ -17,16 +16,14 @@ func main() {
 	if err != nil {
 		fmt.Errorf("failed to create A2A client: %v", err)
 	}
-	
-	sessionID := uuid.New().String()
+
+	contextID := protocol.GenerateContextID()
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("Enter text to send to the agent.")
 	fmt.Println(strings.Repeat("-", 60))
 
 	for {
-
-		taskID := uuid.New().String()
 
 		fmt.Println("> ")
 		input, readErr := reader.ReadString('\n')
@@ -40,98 +37,107 @@ func main() {
 			continue
 		}
 
-		params := createTaskParams(taskID, sessionID, input)
+		params := createMessageParams(input, contextID, 0)
 
-		handleStandardInteraction(a2aClient, params, taskID)
+		handleStandardInteraction(a2aClient, params)
 
 	}
 
 }
 
-func createTaskParams(taskID, sessionID, input string) protocol.SendTaskParams {
-	message := protocol.NewMessage(
+func createMessageParams(input string, contextID string, historyLength int) protocol.SendMessageParams {
+	message := protocol.NewMessageWithContext(
 		protocol.MessageRoleUser,
 		[]protocol.Part{protocol.NewTextPart(input)},
+		nil,
+		&contextID,
 	)
 
-	params := protocol.SendTaskParams{
-		ID:        taskID,
-		SessionID: &sessionID,
-		Message:   message,
-		Metadata:  map[string]any{"invocationKey": "1111-2222-3333-4444"},
+	params := protocol.SendMessageParams{
+		Message: message,
+	}
+
+	if historyLength > 0 {
+		params.Configuration = &protocol.SendMessageConfiguration{
+			HistoryLength: &historyLength,
+		}
 	}
 
 	return params
 }
 
-func handleStandardInteraction(a2aClient *client.A2AClient, params protocol.SendTaskParams, taskID string) {
+func handleStandardInteraction(a2aClient *client.A2AClient, params protocol.SendMessageParams) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	task, err := a2aClient.SendTasks(ctx, params)
+	messageResult, err := a2aClient.SendMessage(ctx, params)
 	if err != nil {
-		fmt.Printf("failed to send tasks %v", err)
+		fmt.Printf("failed to send message %v", err)
 		return
 	}
 
-	fmt.Printf("  State: %s (%s)\n", task.Status.State, task.Status.Timestamp)
-
-	historyLength := 10
-
-	if task.Status.State == protocol.TaskStateCompleted {
-		queryParams := protocol.TaskQueryParams{
-			ID:            taskID,
-			HistoryLength: &historyLength,
-		}
-
-		task, err = a2aClient.GetTasks(ctx, queryParams)
-		if err != nil {
-			fmt.Printf("failed to get tasks %v", err)
-			return
-		}
-
-		for i := 0; i < len(task.History)-1; i++ {
-			message := task.History[i]
-			if message.Role == protocol.MessageRoleAgent {
-				fmt.Printf("\033[1;32m%s", "Agent Response")
-				fmt.Println(strings.Repeat("-", 60))
-				printParts(message.Parts)
-				fmt.Printf("\033[0:30m%s", "\n")
-			} else {
-				fmt.Printf("\033[1;30m%s", "User Response")
-				fmt.Println(strings.Repeat("-", 60))
-				printParts(message.Parts)
-				fmt.Printf("\033[0:30m%s", "\n")
-			}
-		}
-
-		if len(task.Artifacts) > 0 {
-			for _, artifact := range task.Artifacts {
-				fmt.Printf("Artifact [%s]\n", *artifact.Name)
-				printParts(artifact.Parts)
-			}
-		}
+	switch result := messageResult.Result.(type) {
+	case *protocol.Message:
+		fmt.Println("[Message Response:]")
+		printMessage(*result)
+	case *protocol.Task:
+		fmt.Printf("[Task %s State %s]\n", result.ID, result.Status.State)
+		printTaskResult(result)
 	}
 
 	fmt.Println(strings.Repeat("-", 60))
 
 }
 
-func printParts(parts []protocol.Part) {
-	for _, part := range parts {
-		printPart(part)
+func printMessage(message protocol.Message) {
+	fmt.Printf("Message ID: %s", message.MessageID)
+	if message.ContextID != nil {
+		fmt.Printf("Context ID: %s", *message.ContextID)
+	}
+	fmt.Printf("Role: %s", message.Role)
+
+	fmt.Printf("Message parts:")
+	for i, part := range message.Parts {
+		switch p := part.(type) {
+		case *protocol.TextPart:
+			fmt.Printf("  Part %d (text): %s", i+1, p.Text)
+		case *protocol.FilePart:
+			fmt.Printf("  Part %d (file): [file content]", i+1)
+		case *protocol.DataPart:
+			fmt.Printf("  Part %d (data): %+v", i+1, p.Data)
+		default:
+			fmt.Printf("  Part %d (unknown): %+v", i+1, part)
+		}
 	}
 }
 
-func printPart(part interface{}) {
-	indent := "  "
+func printTaskResult(task *protocol.Task) {
+	if task.Status.Message != nil {
+		fmt.Printf("Task result message:")
+		printMessage(*task.Status.Message)
+	}
 
-	switch p := part.(type) {
-	case protocol.TextPart:
-		fmt.Println(indent + p.Text)
-	case protocol.FilePart:
-	case protocol.DataPart:
-	default:
-		fmt.Printf("%sUnsupported part type: %T\n", indent, p)
+	// Print artifacts if any
+	if len(task.Artifacts) > 0 {
+		fmt.Printf("Task artifacts:")
+		for i, artifact := range task.Artifacts {
+			name := "Unnamed"
+			if artifact.Name != nil {
+				name = *artifact.Name
+			}
+			fmt.Printf("  Artifact %d: %s", i+1, name)
+			for j, part := range artifact.Parts {
+				switch p := part.(type) {
+				case *protocol.TextPart:
+					fmt.Printf("    Part %d (text): %s", j+1, p.Text)
+				case *protocol.FilePart:
+					fmt.Printf("    Part %d (file): [file content]", j+1)
+				case *protocol.DataPart:
+					fmt.Printf("    Part %d (data): %+v", j+1, p.Data)
+				default:
+					fmt.Printf("    Part %d (unknown): %+v", j+1, part)
+				}
+			}
+		}
 	}
 }
