@@ -5,10 +5,13 @@ type Query {
 }
 
 type Subscription {
-    agentTaskExecute(task: TaskInput): AgentResponse!
+    agentSendMessage(message: MessageInput): AgentResponse!
 }
 
 type AgentResponse {
+    messageId: String
+    taskId: String
+    contextId: String
     parts: [Part!]!
     responseType: String
     responseState: String
@@ -27,8 +30,8 @@ type FilePart {
     uri: String
 }
 
-input TaskInput {
-    id: String
-    contextId: String!
-    message: String!
+input MessageInput {
+    contextId: String
+    messageId: String
+    text: String!
 }

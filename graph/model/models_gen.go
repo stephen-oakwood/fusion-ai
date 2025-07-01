@@ -7,6 +7,9 @@ type Part interface {
 }
 
 type AgentResponse struct {
+	MessageID     *string `json:"messageId,omitempty"`
+	TaskID        *string `json:"taskId,omitempty"`
+	ContextID     *string `json:"contextId,omitempty"`
 	Parts         []Part  `json:"parts"`
 	ResponseType  *string `json:"responseType,omitempty"`
 	ResponseState *string `json:"responseState,omitempty"`
@@ -21,16 +24,16 @@ type FilePart struct {
 
 func (FilePart) IsPart() {}
 
+type MessageInput struct {
+	ContextID *string `json:"contextId,omitempty"`
+	MessageID *string `json:"messageId,omitempty"`
+	Text      string  `json:"text"`
+}
+
 type Query struct {
 }
 
 type Subscription struct {
-}
-
-type TaskInput struct {
-	ID        *string `json:"id,omitempty"`
-	ContextID string  `json:"contextId"`
-	Message   string  `json:"message"`
 }
 
 type TextPart struct {

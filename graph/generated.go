@@ -49,9 +49,12 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	AgentResponse struct {
+		ContextID     func(childComplexity int) int
+		MessageID     func(childComplexity int) int
 		Parts         func(childComplexity int) int
 		ResponseState func(childComplexity int) int
 		ResponseType  func(childComplexity int) int
+		TaskID        func(childComplexity int) int
 	}
 
 	FilePart struct {
@@ -66,7 +69,7 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		AgentTaskExecute func(childComplexity int, task *model.TaskInput) int
+		AgentSendMessage func(childComplexity int, message *model.MessageInput) int
 	}
 
 	TextPart struct {
@@ -78,7 +81,7 @@ type QueryResolver interface {
 	Placeholder(ctx context.Context) (*string, error)
 }
 type SubscriptionResolver interface {
-	AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error)
+	AgentSendMessage(ctx context.Context, message *model.MessageInput) (<-chan *model.AgentResponse, error)
 }
 
 type executableSchema struct {
@@ -100,6 +103,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
+	case "AgentResponse.contextId":
+		if e.complexity.AgentResponse.ContextID == nil {
+			break
+		}
+
+		return e.complexity.AgentResponse.ContextID(childComplexity), true
+
+	case "AgentResponse.messageId":
+		if e.complexity.AgentResponse.MessageID == nil {
+			break
+		}
+
+		return e.complexity.AgentResponse.MessageID(childComplexity), true
+
 	case "AgentResponse.parts":
 		if e.complexity.AgentResponse.Parts == nil {
 			break
@@ -120,6 +137,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AgentResponse.ResponseType(childComplexity), true
+
+	case "AgentResponse.taskId":
+		if e.complexity.AgentResponse.TaskID == nil {
+			break
+		}
+
+		return e.complexity.AgentResponse.TaskID(childComplexity), true
 
 	case "FilePart.bytes":
 		if e.complexity.FilePart.Bytes == nil {
@@ -156,17 +180,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.Placeholder(childComplexity), true
 
-	case "Subscription.agentTaskExecute":
-		if e.complexity.Subscription.AgentTaskExecute == nil {
+	case "Subscription.agentSendMessage":
+		if e.complexity.Subscription.AgentSendMessage == nil {
 			break
 		}
 
-		args, err := ec.field_Subscription_agentTaskExecute_args(ctx, rawArgs)
+		args, err := ec.field_Subscription_agentSendMessage_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Subscription.AgentTaskExecute(childComplexity, args["task"].(*model.TaskInput)), true
+		return e.complexity.Subscription.AgentSendMessage(childComplexity, args["message"].(*model.MessageInput)), true
 
 	case "TextPart.text":
 		if e.complexity.TextPart.Text == nil {
@@ -183,7 +207,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
-		ec.unmarshalInputTaskInput,
+		ec.unmarshalInputMessageInput,
 	)
 	first := true
 
@@ -325,26 +349,26 @@ func (ec *executionContext) field_Query___type_argsName(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Subscription_agentTaskExecute_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Subscription_agentSendMessage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Subscription_agentTaskExecute_argsTask(ctx, rawArgs)
+	arg0, err := ec.field_Subscription_agentSendMessage_argsMessage(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["task"] = arg0
+	args["message"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Subscription_agentTaskExecute_argsTask(
+func (ec *executionContext) field_Subscription_agentSendMessage_argsMessage(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (*model.TaskInput, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("task"))
-	if tmp, ok := rawArgs["task"]; ok {
-		return ec.unmarshalOTaskInput2ᚖfusionᚋgraphᚋmodelᚐTaskInput(ctx, tmp)
+) (*model.MessageInput, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+	if tmp, ok := rawArgs["message"]; ok {
+		return ec.unmarshalOMessageInput2ᚖfusionᚋgraphᚋmodelᚐMessageInput(ctx, tmp)
 	}
 
-	var zeroVal *model.TaskInput
+	var zeroVal *model.MessageInput
 	return zeroVal, nil
 }
 
@@ -447,6 +471,129 @@ func (ec *executionContext) field___Type_fields_argsIncludeDeprecated(
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AgentResponse_messageId(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AgentResponse_messageId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MessageID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AgentResponse_messageId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentResponse_taskId(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AgentResponse_taskId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TaskID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AgentResponse_taskId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AgentResponse_contextId(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AgentResponse_contextId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContextID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AgentResponse_contextId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AgentResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _AgentResponse_parts(ctx context.Context, field graphql.CollectedField, obj *model.AgentResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AgentResponse_parts(ctx, field)
@@ -916,8 +1063,8 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Subscription_agentTaskExecute(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
-	fc, err := ec.fieldContext_Subscription_agentTaskExecute(ctx, field)
+func (ec *executionContext) _Subscription_agentSendMessage(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_agentSendMessage(ctx, field)
 	if err != nil {
 		return nil
 	}
@@ -930,7 +1077,7 @@ func (ec *executionContext) _Subscription_agentTaskExecute(ctx context.Context, 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Subscription().AgentTaskExecute(rctx, fc.Args["task"].(*model.TaskInput))
+		return ec.resolvers.Subscription().AgentSendMessage(rctx, fc.Args["message"].(*model.MessageInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -961,7 +1108,7 @@ func (ec *executionContext) _Subscription_agentTaskExecute(ctx context.Context, 
 	}
 }
 
-func (ec *executionContext) fieldContext_Subscription_agentTaskExecute(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Subscription_agentSendMessage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Subscription",
 		Field:      field,
@@ -969,6 +1116,12 @@ func (ec *executionContext) fieldContext_Subscription_agentTaskExecute(ctx conte
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "messageId":
+				return ec.fieldContext_AgentResponse_messageId(ctx, field)
+			case "taskId":
+				return ec.fieldContext_AgentResponse_taskId(ctx, field)
+			case "contextId":
+				return ec.fieldContext_AgentResponse_contextId(ctx, field)
 			case "parts":
 				return ec.fieldContext_AgentResponse_parts(ctx, field)
 			case "responseType":
@@ -986,7 +1139,7 @@ func (ec *executionContext) fieldContext_Subscription_agentTaskExecute(ctx conte
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Subscription_agentTaskExecute_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Subscription_agentSendMessage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2988,41 +3141,41 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
-func (ec *executionContext) unmarshalInputTaskInput(ctx context.Context, obj any) (model.TaskInput, error) {
-	var it model.TaskInput
+func (ec *executionContext) unmarshalInputMessageInput(ctx context.Context, obj any) (model.MessageInput, error) {
+	var it model.MessageInput
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "contextId", "message"}
+	fieldsInOrder := [...]string{"contextId", "messageId", "text"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "id":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		case "contextId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contextId"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.ID = data
-		case "contextId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contextId"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
 			it.ContextID = data
-		case "message":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+		case "messageId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("messageId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MessageID = data
+		case "text":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("text"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Message = data
+			it.Text = data
 		}
 	}
 
@@ -3071,6 +3224,12 @@ func (ec *executionContext) _AgentResponse(ctx context.Context, sel ast.Selectio
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("AgentResponse")
+		case "messageId":
+			out.Values[i] = ec._AgentResponse_messageId(ctx, field, obj)
+		case "taskId":
+			out.Values[i] = ec._AgentResponse_taskId(ctx, field, obj)
+		case "contextId":
+			out.Values[i] = ec._AgentResponse_contextId(ctx, field, obj)
 		case "parts":
 			out.Values[i] = ec._AgentResponse_parts(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3233,8 +3392,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 
 	switch fields[0].Name {
-	case "agentTaskExecute":
-		return ec._Subscription_agentTaskExecute(ctx, fields[0])
+	case "agentSendMessage":
+		return ec._Subscription_agentSendMessage(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -3997,6 +4156,14 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) unmarshalOMessageInput2ᚖfusionᚋgraphᚋmodelᚐMessageInput(ctx context.Context, v any) (*model.MessageInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputMessageInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {
 	if v == nil {
 		return nil, nil
@@ -4013,14 +4180,6 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
-}
-
-func (ec *executionContext) unmarshalOTaskInput2ᚖfusionᚋgraphᚋmodelᚐTaskInput(ctx context.Context, v any) (*model.TaskInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalInputTaskInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

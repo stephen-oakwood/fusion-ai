@@ -34,10 +34,10 @@ func (r *Resolver) Placeholder(ctx context.Context) (*string, error) {
 	return &str, nil
 }
 
-func (r *Resolver) AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error) {
+func (r *Resolver) AgentSendMessage(ctx context.Context, messageInput *model.MessageInput) (<-chan *model.AgentResponse, error) {
 	subscriptionChan := make(chan *model.AgentResponse)
 
-	params := createMessageParams(task.Message, task.ContextID, 0)
+	params := createMessageParams(messageInput, 0)
 
 	agentChan, err := r.a2aClient.StreamMessage(ctx, params)
 	if err != nil {
@@ -91,6 +91,9 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.Stream
 					responseState := string(e.Status.State)
 
 					agentMessage := model.AgentResponse{
+						MessageID:     &e.Status.Message.MessageID,
+						TaskID:        &e.TaskID,
+						ContextID:     &e.ContextID,
 						Parts:         parts,
 						ResponseType:  &responseType,
 						ResponseState: &responseState,
@@ -124,6 +127,8 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.Stream
 
 				responseType := "TaskArtifactUpdateEvent"
 				agentMessage := model.AgentResponse{
+					TaskID:       &e.TaskID,
+					ContextID:    &e.ContextID,
 					Parts:        parts,
 					ResponseType: &responseType,
 				}
@@ -138,12 +143,12 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.Stream
 	}
 }
 
-func createMessageParams(input string, contextID string, historyLength int) protocol.SendMessageParams {
+func createMessageParams(messageInput *model.MessageInput, historyLength int) protocol.SendMessageParams {
 	message := protocol.NewMessageWithContext(
 		protocol.MessageRoleUser,
-		[]protocol.Part{protocol.NewTextPart(input)},
+		[]protocol.Part{protocol.NewTextPart(messageInput.Text)},
 		nil,
-		&contextID,
+		messageInput.ContextID,
 	)
 
 	params := protocol.SendMessageParams{

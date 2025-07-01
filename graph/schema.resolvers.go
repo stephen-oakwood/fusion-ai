@@ -15,9 +15,9 @@ func (r *queryResolver) Placeholder(ctx context.Context) (*string, error) {
 	panic(fmt.Errorf("not implemented: Placeholder - placeholder"))
 }
 
-// AgentTaskExecute is the resolver for the agentTaskExecute field.
-func (r *subscriptionResolver) AgentTaskExecute(ctx context.Context, task *model.TaskInput) (<-chan *model.AgentResponse, error) {
-	panic(fmt.Errorf("not implemented: AgentTaskExecute - agentTaskExecute"))
+// AgentSendMessage is the resolver for the agentSendMessage field.
+func (r *subscriptionResolver) AgentSendMessage(ctx context.Context, message *model.MessageInput) (<-chan *model.AgentResponse, error) {
+	panic(fmt.Errorf("not implemented: AgentSendMessage - agentSendMessage"))
 }
 
 // Query returns QueryResolver implementation.
