@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"fusion/graph"
 	"fusion/graph/model"
+	"github.com/google/uuid"
 	"trpc.group/trpc-go/trpc-a2a-go/client"
 	"trpc.group/trpc-go/trpc-a2a-go/protocol"
 )
@@ -87,19 +88,24 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.Stream
 						}
 					}
 
-					responseType := "TaskStatusUpdateEvent"
-					responseState := string(e.Status.State)
-
-					agentMessage := model.AgentResponse{
-						MessageID:     &e.Status.Message.MessageID,
-						TaskID:        &e.TaskID,
-						ContextID:     &e.ContextID,
-						Parts:         parts,
-						ResponseType:  &responseType,
-						ResponseState: &responseState,
+					taskStatusUpdate := &model.TaskStatusUpdate{
+						TaskID:    &e.TaskID,
+						ContextID: &e.ContextID,
+						Status: &model.TaskStatus{
+							State: string(e.Status.State),
+							Message: &model.Message{
+								MessageID: e.Status.Message.MessageID,
+								Role:      "agent",
+								Parts:     parts,
+							},
+						},
 					}
 
-					subscriptionChan <- &agentMessage
+					agentResponse := &model.AgentResponse{
+						ProcessingResult: taskStatusUpdate,
+					}
+
+					subscriptionChan <- agentResponse
 				}
 
 				if e.IsFinal() {
@@ -125,15 +131,22 @@ func processAgentResponses(ctx context.Context, agentChan <-chan protocol.Stream
 					}
 				}
 
-				responseType := "TaskArtifactUpdateEvent"
-				agentMessage := model.AgentResponse{
-					TaskID:       &e.TaskID,
-					ContextID:    &e.ContextID,
-					Parts:        parts,
-					ResponseType: &responseType,
+				taskArtifactUpdate := &model.TaskArtifactUpdate{
+					TaskID:    &e.TaskID,
+					ContextID: &e.ContextID,
+					Artifact: &model.Artifact{
+						ArtifactID:  uuid.NewString(),
+						Name:        e.Artifact.Name,
+						Description: e.Artifact.Description,
+						Parts:       parts,
+					},
 				}
 
-				subscriptionChan <- &agentMessage
+				agentResponse := &model.AgentResponse{
+					ProcessingResult: taskArtifactUpdate,
+				}
+
+				subscriptionChan <- agentResponse
 
 			default:
 				fmt.Println("Warning: received unknown event type: %T\n ", event)

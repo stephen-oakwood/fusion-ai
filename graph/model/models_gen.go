@@ -6,13 +6,19 @@ type Part interface {
 	IsPart()
 }
 
+type ProcessingResult interface {
+	IsProcessingResult()
+}
+
 type AgentResponse struct {
-	MessageID     *string `json:"messageId,omitempty"`
-	TaskID        *string `json:"taskId,omitempty"`
-	ContextID     *string `json:"contextId,omitempty"`
-	Parts         []Part  `json:"parts"`
-	ResponseType  *string `json:"responseType,omitempty"`
-	ResponseState *string `json:"responseState,omitempty"`
+	ProcessingResult ProcessingResult `json:"processingResult"`
+}
+
+type Artifact struct {
+	ArtifactID  string  `json:"artifactId"`
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Parts       []Part  `json:"parts"`
 }
 
 type FilePart struct {
@@ -23,6 +29,12 @@ type FilePart struct {
 }
 
 func (FilePart) IsPart() {}
+
+type Message struct {
+	MessageID string `json:"messageId"`
+	Role      string `json:"role"`
+	Parts     []Part `json:"parts"`
+}
 
 type MessageInput struct {
 	ContextID *string `json:"contextId,omitempty"`
@@ -35,6 +47,28 @@ type Query struct {
 
 type Subscription struct {
 }
+
+type TaskArtifactUpdate struct {
+	TaskID    *string   `json:"taskId,omitempty"`
+	ContextID *string   `json:"contextId,omitempty"`
+	Artifact  *Artifact `json:"artifact,omitempty"`
+}
+
+func (TaskArtifactUpdate) IsProcessingResult() {}
+
+type TaskStatus struct {
+	State     string   `json:"state"`
+	Message   *Message `json:"message,omitempty"`
+	Timestamp *string  `json:"timestamp,omitempty"`
+}
+
+type TaskStatusUpdate struct {
+	TaskID    *string     `json:"taskId,omitempty"`
+	ContextID *string     `json:"contextId,omitempty"`
+	Status    *TaskStatus `json:"status,omitempty"`
+}
+
+func (TaskStatusUpdate) IsProcessingResult() {}
 
 type TextPart struct {
 	Text string `json:"text"`

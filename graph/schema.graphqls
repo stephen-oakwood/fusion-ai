@@ -9,12 +9,40 @@ type Subscription {
 }
 
 type AgentResponse {
-    messageId: String
+    processingResult: ProcessingResult!
+}
+
+union ProcessingResult = TaskStatusUpdate | TaskArtifactUpdate
+
+type TaskStatusUpdate {
     taskId: String
     contextId: String
+    status: TaskStatus
+}
+
+type TaskArtifactUpdate {
+    taskId: String
+    contextId: String
+    artifact: Artifact
+}
+
+type TaskStatus {
+    state: String!
+    message: Message
+    timestamp: String
+}
+
+type Message {
+    messageId: String!
+    role: String!
     parts: [Part!]!
-    responseType: String
-    responseState: String
+}
+
+type Artifact {
+    artifactId: String!
+    name: String
+    description: String
+    parts: [Part!]!
 }
 
 union Part = TextPart | FilePart
