@@ -23,9 +23,10 @@ const systemPrompt = `
 
 type assetManagementAgent struct {
 	ModelClient *modelClient
+	Token       string
 }
 
-func NewAgent() (*assetManagementAgent, error) {
+func NewAgent(token string) (*assetManagementAgent, error) {
 	modelClient, err := NewModelClient()
 	if err != nil {
 		return nil, err
@@ -33,6 +34,7 @@ func NewAgent() (*assetManagementAgent, error) {
 
 	return &assetManagementAgent{
 		ModelClient: modelClient,
+		Token:       token,
 	}, nil
 }
 
@@ -194,7 +196,7 @@ func (p *assetManagementAgent) processRequest(ctx context.Context, inputText str
 				}
 			}
 
-			err := nable.HandleToolUse(converseOutput.Output, &converseInput.Messages)
+			err := nable.HandleToolUse(converseOutput.Output, &converseInput.Messages, p.Token)
 
 			if err != nil {
 				err = handle.UpdateTaskState(&taskID, protocol.TaskStateFailed, nil)

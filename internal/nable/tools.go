@@ -14,10 +14,6 @@ import (
 	"time"
 )
 
-const (
-	Token = "eyJhbGciOiJSUzI1NiIsImtpZCI6IkYxOTZFODUxMUI1RjUyMjhCREMxNDRGNkUxMEFFOTlGQ0EzQ0MzRkZSUzI1NiIsIng1dCI6IjhaYm9VUnRmVWlpOXdVVDI0UXJwbjhvOHdfOCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3Nzby5zdGcuc2hhcmVkc3Zjcy5zeXN0ZW0tbW9uaXRvci5jb20iLCJuYmYiOjE3NTE1MzE0ODgsImlhdCI6MTc1MTUzMTQ4OCwiZXhwIjoxNzUxNTM1MDg4LCJhdWQiOiJodHRwczovL3Nzby5zdGcuc2hhcmVkc3Zjcy5zeXN0ZW0tbW9uaXRvci5jb20vcmVzb3VyY2VzIiwic2NvcGUiOlsib3BlbmlkIiwiZW1haWwiLCJwcm9maWxlIiwib2ZmbGluZV9hY2Nlc3MiXSwiYW1yIjpbInB3ZCJdLCJjbGllbnRfaWQiOiJkOTE3Y2UzYS1hM2Q0LTQ5MzMtODgwNC00NGI5NDY2MTFkMTkiLCJzdWIiOiI0ODc3ZjZmYi0xMDQ2LTQxZDktODU5NS01MmJmMTYxYzI3YTkiLCJhdXRoX3RpbWUiOjE3NTE1MzE0NjcsImlkcCI6ImxvY2FsIiwic2lkIjoiREFFM0M5RDgwMkUwQjEyQUI3REVDRjVGNzdCRjQ3QUQiLCJqdGkiOiI1NTdDNzExOUE0M0U5NThCNzIwN0VDMDRGQkZFREFFRiJ9.sMzxr9F03_wij0I18n0siZ5j2m5uILAnyxd0pi-8cBUwWfVsTwrPhhwLxntE1op26RRpbJO79J0NeqOnbkDkoSmNg7u5lsqY_JV0tI01rO4hnIf8lnXeoygnp65AIGDSLWNl6W1XwNjYDYrGZxz0lggb2tDn60R16KQt4l_mNXJm2YfXRbKCvZHrTK3OUMxuoD35ideF3LkGcXJXDf7QGUYlSBW6Jw6Gmj86r7KhYmiV4qeO75p-DfpTc7MdnoCysNoENq8TevsZI-zz0WPoqfAME4ztQ5-eOTvvnpVg-BVsUcpMC-jIPSGxp-QhaIsbr7pUV9ODPvJNNhuGlEmJ3A"
-)
-
 type Tools interface {
 	GenerateToolSchema() *types.ToolMemberToolSpec
 	GenerateToolResult(string, map[string]interface{}) (*types.Message, error)
@@ -113,7 +109,7 @@ func (t *QuerySchemaTool) GenerateToolResult(toolUseID string, result map[string
 
 }
 
-func (t *QuerySchemaTool) Invoke(toolUseId string, toolName string, parameters map[string]interface{}) (*types.Message, error) {
+func (t *QuerySchemaTool) Invoke(toolUseId string, toolName string, parameters map[string]interface{}, token string) (*types.Message, error) {
 
 	if toolName != t.Name {
 		return nil, fmt.Errorf("%s not match %s", toolName, t.Name)
@@ -174,7 +170,7 @@ func (t *KnowledgeQueryTool) GenerateToolResult(toolUseID string, result map[str
 
 }
 
-func (t *KnowledgeQueryTool) Invoke(toolUseId string, toolName string, parameters map[string]interface{}) (*types.Message, error) {
+func (t *KnowledgeQueryTool) Invoke(toolUseId string, toolName string, parameters map[string]interface{}, token string) (*types.Message, error) {
 
 	if toolName != t.Name {
 		return nil, fmt.Errorf("%s not match %s", toolName, t.Name)
@@ -187,7 +183,7 @@ func (t *KnowledgeQueryTool) Invoke(toolUseId string, toolName string, parameter
 
 }
 
-func HandleToolUse(output types.ConverseOutput, messages *[]types.Message) error {
+func HandleToolUse(output types.ConverseOutput, messages *[]types.Message, token string) error {
 	switch v := output.(type) {
 	case *types.ConverseOutputMemberMessage:
 		*messages = append(*messages, v.Value)
@@ -204,7 +200,7 @@ func HandleToolUse(output types.ConverseOutput, messages *[]types.Message) error
 					err := d.Value.Input.UnmarshalSmithyDocument(&data)
 
 					if err == nil {
-						message, err := querySchemaTool.Invoke(*d.Value.ToolUseId, *d.Value.Name, data)
+						message, err := querySchemaTool.Invoke(*d.Value.ToolUseId, *d.Value.Name, data, token)
 						if err != nil {
 							fmt.Printf("Error invoking tool: %v\n", err)
 							return err
@@ -219,7 +215,7 @@ func HandleToolUse(output types.ConverseOutput, messages *[]types.Message) error
 					err := d.Value.Input.UnmarshalSmithyDocument(&data)
 
 					if err == nil {
-						message, err := executeQueryTool.Invoke(*d.Value.ToolUseId, *d.Value.Name, data)
+						message, err := executeQueryTool.Invoke(*d.Value.ToolUseId, *d.Value.Name, data, token)
 						if err != nil {
 							fmt.Printf("Error invoking tool: %v\n", err)
 							return err
@@ -234,7 +230,7 @@ func HandleToolUse(output types.ConverseOutput, messages *[]types.Message) error
 					err := d.Value.Input.UnmarshalSmithyDocument(&data)
 
 					if err == nil {
-						message, err := knowledgeQueryTool.Invoke(*d.Value.ToolUseId, *d.Value.Name, data)
+						message, err := knowledgeQueryTool.Invoke(*d.Value.ToolUseId, *d.Value.Name, data, token)
 						if err != nil {
 							fmt.Printf("Error invoking tool: %v\n", err)
 							return err
@@ -300,7 +296,7 @@ func (t *ExecuteQueryTool) GenerateToolResult(toolUseID string, result map[strin
 
 }
 
-func (t *ExecuteQueryTool) Invoke(toolUseId string, toolName string, parameters map[string]interface{}) (*types.Message, error) {
+func (t *ExecuteQueryTool) Invoke(toolUseId string, toolName string, parameters map[string]interface{}, token string) (*types.Message, error) {
 
 	if toolName != t.Name {
 		return nil, fmt.Errorf("%s not match %s", toolName, t.Name)
@@ -312,7 +308,7 @@ func (t *ExecuteQueryTool) Invoke(toolUseId string, toolName string, parameters 
 		return nil, fmt.Errorf("no query")
 	}
 
-	result, err := executeQuery(query)
+	result, err := executeQuery(query, token)
 	if err != nil {
 		fmt.Println("Failed to execute query")
 		return nil, fmt.Errorf("query execution")
@@ -333,7 +329,7 @@ func PrintJSON(data interface{}) {
 	log.Printf("\nJSON:\n%s\n", string(jsonBytes))
 }
 
-func executeQuery(query string) (string, error) {
+func executeQuery(query string, token string) (string, error) {
 
 	payload := &body{Query: query}
 	payloadJSON, err := json.Marshal(payload)
@@ -341,7 +337,7 @@ func executeQuery(query string) (string, error) {
 		fmt.Printf("Failed to marshal the query %s\n", err)
 	}
 
-	bearer := "Bearer " + Token
+	bearer := "Bearer " + token
 	request, err := http.NewRequest(http.MethodPost, "https://stg.api.n-able.com/graphql", bytes.NewBuffer(payloadJSON))
 	request.Header.Add("Authorization", bearer)
 	request.Header.Add("Accept", "application/json")
