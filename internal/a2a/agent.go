@@ -3,7 +3,7 @@ package a2a
 import (
 	"context"
 	"fmt"
-	"fusion/internal/nable"
+	"fusion/internal/tools"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	"time"
@@ -11,14 +11,21 @@ import (
 	"trpc.group/trpc-go/trpc-a2a-go/taskmanager"
 )
 
+//const systemPrompt = `
+//		"You are an IT Technician, capable of providing detailed answers to the questions that your customers ask regarding their assets." +
+//		"Think before you reply. Inform the customer of each step you are going to take." +
+//		"First, determine if there are any knowledge articles related to the question that could help with your reply." +
+//		"Second, using available tools, fetch the schema for a graphQL API that provides the ability to search for assets and return their details." +
+//		"Third, using the fetched schema, use the graphQL API to collect data from the customer's assets that are relevant to the points raised in the knowledge articles.'" +
+//		"Finally, provide a detailed summary that includes the relevant points from the knowledge articles with examples of customer's assets that demonstrate these points. Explicitly name the assets when providing examples." +
+//		"Always fetch the graphQL API Schema first, and construct queries using this schema. Do not construct queries without using the schema."
+//`
+
 const systemPrompt = `
-		"You are an IT Technician, capable of providing detailed answers to the questions that your customers ask regarding their assets." +
-		"Think before you reply. Inform the customer of each step you are going to take." +
-		"First, determine if there are any knowledge articles related to the question that could help with your reply." +
-		"Second, using available tools, fetch the schema for a graphQL API that provides the ability to search for assets and return their details." +
-		"Third, using the fetched schema, use the graphQL API to collect data from the customer's assets that are relevant to the points raised in the knowledge articles.'" +
-		"Finally, provide a detailed summary that includes the relevant points from the knowledge articles with examples of customer's assets that demonstrate these points. Explicitly name the assets when providing examples." +
-		"Always fetch the graphQL API Schema first, and construct queries using this schema. Do not construct queries without using the schema."
+	"You are an IT Technician, capable of providing detailed answers to the questions that your customers ask regarding their assets." +
+	"Think before you reply. Inform the customer of each step you are going to take." +
+	"Tools are available that allow searching knowledge bases, fetching details of an asset," +
+	"obtaining the Schema of a GraphQL API that provides the ability to search and manage assets, plus a tool to invoke generated GraphQL Queries for this API."
 `
 
 type assetManagementAgent struct {
@@ -97,7 +104,7 @@ func (p *assetManagementAgent) processNonStreamingMode(ctx context.Context, inpu
 func (p *assetManagementAgent) processRequest(ctx context.Context, inputText string, contextID *string, taskID string, handle taskmanager.TaskHandler) {
 	var temperature float32 = 0.0
 
-	toolConfig := toolConfig()
+	toolConfig := tools.ToolConfig(handle, taskID, contextID, p.Token)
 	converseInput := &bedrockruntime.ConverseInput{
 		System: []types.SystemContentBlock{
 			&types.SystemContentBlockMemberText{
@@ -196,7 +203,7 @@ func (p *assetManagementAgent) processRequest(ctx context.Context, inputText str
 				}
 			}
 
-			err := nable.HandleToolUse(converseOutput.Output, &converseInput.Messages, p.Token)
+			err := tools.HandleToolUse(converseOutput.Output, &converseInput.Messages, p.Token)
 
 			if err != nil {
 				err = handle.UpdateTaskState(&taskID, protocol.TaskStateFailed, nil)

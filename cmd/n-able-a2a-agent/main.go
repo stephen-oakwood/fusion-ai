@@ -4,14 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"fusion/internal/a2a"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"trpc.group/trpc-go/trpc-a2a-go/protocol"
-
-	"github.com/redis/go-redis/v9"
 
 	"trpc.group/trpc-go/trpc-a2a-go/server"
 	redisTaskManager "trpc.group/trpc-go/trpc-a2a-go/taskmanager/redis"
@@ -77,12 +75,7 @@ func parseFlags() Config {
 	var config Config
 
 	flag.StringVar(&config.Token, "token", "", "User SSO Token")
-	flag.StringVar(&config.ContextID, "context", "", "Use specific context ID (empty = generate new)")
 	flag.Parse()
-
-	if config.ContextID == "" {
-		config.ContextID = protocol.GenerateContextID()
-	}
 
 	return config
 }

@@ -1,0 +1,21 @@
+query AssetDetails($id: ID!) {
+    asset(id: $id) {
+        id
+        name
+        description
+        systemInfo {
+            manufacturer
+            model
+            cpuCores
+            cpuName
+            memoryTotalSizeGB
+            hostname
+        }
+        operatingSystem {
+            name
+            version
+            architecture
+        }
+        lastBootedAt
+    }
+}

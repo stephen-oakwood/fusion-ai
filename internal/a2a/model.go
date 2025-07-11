@@ -3,10 +3,8 @@ package a2a
 import (
 	"context"
 	"fmt"
-	"fusion/internal/nable"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
-	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 )
 
 type modelClient struct {
@@ -34,18 +32,4 @@ func (i *modelClient) Converse(ctx context.Context, converseInput *bedrockruntim
 		return nil, err
 	}
 	return converseOutput, nil
-}
-
-func toolConfig() types.ToolConfiguration {
-	querySchemaToolSchema := nable.GetQuerySchemaTool().GenerateToolSchema()
-	executeQueryToolSchema := nable.GetExecuteQueryTool().GenerateToolSchema()
-	knowledgeQueryToolSchema := nable.GetKnowledgeQueryTool().GenerateToolSchema()
-
-	return types.ToolConfiguration{
-		Tools: []types.Tool{
-			querySchemaToolSchema,
-			executeQueryToolSchema,
-			knowledgeQueryToolSchema,
-		},
-	}
 }
