@@ -23,9 +23,9 @@ import (
 
 const systemPrompt = `
 	"You are an IT Technician, capable of providing detailed answers to the questions that your customers ask regarding their assets." +
-	"Think before you reply. Inform the customer of each step you are going to take." +
-	"Tools are available that allow searching knowledge bases, fetching details of an asset," +
-	"obtaining the Schema of a GraphQL API that provides the ability to search and manage assets, plus a tool to invoke generated GraphQL Queries for this API."
+	"Think before you reply. Inform the customer of each step you are going to take. This includes the use of any tools. Always provide the results from using a tool to the user." +
+	"Determine if there are any knowledge articles related to the question that could help with your reply." +
+	"Use available tools to collect data from assets"
 `
 
 type assetManagementAgent struct {
@@ -105,6 +105,9 @@ func (p *assetManagementAgent) processNonStreamingMode(ctx context.Context, inpu
 func (p *assetManagementAgent) processRequest(ctx context.Context, inputText string, contextID *string, taskID string, handle taskmanager.TaskHandler) {
 	var temperature float32 = 0.0
 
+	messages := handle.GetMessageHistory()
+	converseMessages := mapMessagesToConverseMessages(messages)
+
 	toolConfig := tools.ToolConfig(handle, taskID, contextID, p.Token)
 	converseInput := &bedrockruntime.ConverseInput{
 		System: []types.SystemContentBlock{
@@ -112,17 +115,8 @@ func (p *assetManagementAgent) processRequest(ctx context.Context, inputText str
 				Value: systemPrompt,
 			},
 		},
-		ModelId: &p.ModelClient.BedrockModel,
-		Messages: []types.Message{
-			{
-				Content: []types.ContentBlock{
-					&types.ContentBlockMemberText{
-						Value: inputText,
-					},
-				},
-				Role: types.ConversationRoleUser,
-			},
-		},
+		ModelId:    &p.ModelClient.BedrockModel,
+		Messages:   converseMessages,
 		ToolConfig: &toolConfig,
 		InferenceConfig: &types.InferenceConfiguration{
 			Temperature: &temperature,
@@ -237,4 +231,39 @@ func extractText(message protocol.Message) string {
 		}
 	}
 	return inputText
+}
+
+func mapMessagesToConverseMessages(messages []protocol.Message) []types.Message {
+	var convertedMessages = make([]types.Message, len(messages))
+	for i, message := range messages {
+		var content = make([]types.ContentBlock, len(message.Parts))
+		for j, part := range message.Parts {
+			switch convertedPart := part.(type) {
+			case *protocol.TextPart:
+				content[j] = &types.ContentBlockMemberText{
+					Value: convertedPart.Text,
+				}
+				continue
+			default:
+				fmt.Errorf("unsupported message part type")
+
+				content[j] = &types.ContentBlockMemberText{
+					Value: "Unsupported message part type",
+				}
+				continue
+			}
+		}
+
+		if message.Role == protocol.MessageRoleAgent {
+			message.Role = "assistant"
+		}
+
+		convertedMessages[i] = types.Message{
+			Role:    types.ConversationRole(message.Role),
+			Content: content,
+		}
+
+	}
+
+	return convertedMessages
 }

@@ -88,7 +88,7 @@ func handleStreamingInteraction(a2aClient *client.A2AClient, params protocol.Sen
 
 	fmt.Printf("Stream processing finished for message %s", params.Message.MessageID)
 	fmt.Println(strings.Repeat("-", 60))
-	
+
 	return taskID
 }
 

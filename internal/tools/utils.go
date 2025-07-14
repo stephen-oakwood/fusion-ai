@@ -97,6 +97,8 @@ func HandleToolUse(output types.ConverseOutput, messages *[]types.Message, token
 
 		for _, item := range v.Value.Content {
 			switch contentBlock := item.(type) {
+			case *types.ContentBlockMemberReasoningContent:
+				fmt.Printf("Handle Tool Use: Content Block Member Reasoning Content: %s\n", contentBlock.Value)
 			case *types.ContentBlockMemberText:
 				fmt.Printf("Handle Tool Use: Content Block Member Text: %s\n", contentBlock.Value)
 			case *types.ContentBlockMemberToolUse:
