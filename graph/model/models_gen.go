@@ -32,12 +32,15 @@ func (FilePart) IsPart() {}
 
 type Message struct {
 	MessageID string `json:"messageId"`
+	TaskID    string `json:"taskId"`
+	ContextID string `json:"contextId"`
 	Role      string `json:"role"`
 	Parts     []Part `json:"parts"`
 }
 
 type MessageInput struct {
 	ContextID *string `json:"contextId,omitempty"`
+	TaskID    *string `json:"taskId,omitempty"`
 	MessageID *string `json:"messageId,omitempty"`
 	Text      string  `json:"text"`
 }

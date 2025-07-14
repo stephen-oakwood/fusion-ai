@@ -60,7 +60,8 @@ func (p *assetManagementAgent) ProcessMessage(ctx context.Context, message proto
 		}, nil
 	}
 
-	taskID, err := handle.BuildTask(nil, message.ContextID)
+	specificTaskID := message.TaskID
+	taskID, err := handle.BuildTask(specificTaskID, message.ContextID)
 	if err != nil {
 		return nil, fmt.Errorf("process message - failed to create task: %w", err)
 	}

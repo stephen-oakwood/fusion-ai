@@ -160,7 +160,7 @@ func createMessageParams(messageInput *model.MessageInput, historyLength int) pr
 	message := protocol.NewMessageWithContext(
 		protocol.MessageRoleUser,
 		[]protocol.Part{protocol.NewTextPart(messageInput.Text)},
-		nil,
+		messageInput.TaskID,
 		messageInput.ContextID,
 	)
 
